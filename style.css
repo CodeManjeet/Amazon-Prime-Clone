@@ -464,6 +464,10 @@ footer ul li:hover {
         float: none;
         justify-content: end;
     }
+
+    .all-channel{
+        flex-direction: column;
+    }
 }
 
 @media (max-width: 400px) {
