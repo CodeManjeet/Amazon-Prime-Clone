@@ -468,6 +468,16 @@ footer ul li:hover {
     .all-channel{
         flex-direction: column;
     }
+
+    footer ul{
+        flex-direction: column;
+        gap: 0px;
+        align-items: center;
+    }
+
+    .copyright{
+        text-align: center;
+    }
 }
 
 @media (max-width: 400px) {
