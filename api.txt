@@ -1,0 +1,94 @@
+from fastapi import FastAPI, Request, HTTPException
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+import requests
+from bs4 import BeautifulSoup
+
+app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust this based on your security requirements
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+def fetch_movie_details(url, base_url):
+    """
+    Fetches movie details from the given URL.
+
+    Args:
+        url: The URL of the movie page.
+        base_url: The base URL of the website.
+
+    Returns:
+        A dictionary containing the movie details, 
+        or None if the details could not be fetched.
+    """
+    try:
+        response = requests.get(base_url + url)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        soup = BeautifulSoup(response.content, 'html.parser')
+
+        # Find the download link container
+        download_links_container = soup.find("div", class_="dlbtn") 
+
+        if download_links_container:
+            download_link_element = download_links_container.find("a", class_="dl") 
+            if download_link_element:
+                download_link = download_link_element["href"]
+                return {"download_link": download_link}
+
+    except requests.exceptions.RequestException as e:
+        print(f"Error fetching page: {e}")
+    except Exception as e:
+        print(f"An unexpected error occurred: {e}")
+    return None
+
+@app.get("/search_movie")
+async def search_movie(query: str):
+    """
+    Searches for movies on FilmyFly.earth based on the given query and returns only the top result.
+
+    Args:
+        query: The search query string.
+
+    Returns:
+        A JSONResponse containing a dictionary for the top result,
+        where the dictionary contains only the "download_link" key.
+    """
+    url = f"https://filmyfly.capetown/site-1.html?to-search={query}"
+    try:
+        response = requests.get(url)
+        response.raise_for_status()  # Raise an exception for bad status codes
+        soup = BeautifulSoup(response.content, "html.parser")
+
+        movie_containers = soup.find_all("div", class_="A2")
+
+        for container in movie_containers:
+            try:
+                link_element = container.find("a")
+                link = link_element["href"]
+
+                # Fetch movie details (only download link)
+                download_link = fetch_movie_details(link, "https://filmyfly.capetown/")
+
+                if download_link:  # Return the first download link found
+                    return JSONResponse(content=download_link)
+
+            except AttributeError as e:
+                # Handle missing elements gracefully (optional)
+                print(f"Error parsing movie container: {e}")
+                continue  # Skip to the next container
+
+        return JSONResponse(content={"message": "No results found."}, status_code=404)
+
+    except requests.exceptions.RequestException as e:
+        return JSONResponse(content={"error": f"Request failed: {e}"}, status_code=500)
+    except Exception as e:  # Catch general exceptions
+        return JSONResponse(content={"error": f"An unexpected error occurred: {e}"}, status_code=500)
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
